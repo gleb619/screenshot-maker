@@ -7,7 +7,7 @@ const { WebClient } = require('@slack/web-api');
 
 const token = process.env.SLACK_TOKEN || 'YOURS-DEFAULT-TOKEN';
 const site = process.env.SITE || 'https://google.com';
-const channel = process.env.CHANNEL || 'test-channel';
+const channel = process.env.CHANNEL || 'general';
 const web = new WebClient(token);
 const app = express();
 const port = 9000;
