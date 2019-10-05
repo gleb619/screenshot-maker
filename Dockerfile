@@ -1,7 +1,8 @@
 FROM node:8.10.0
 
-ENV SLACK_TOKEN='' \
-    SITE=''
+ENV SLACK_TOKEN='YOURS-DEFAULT-TOKEN' \
+    SITE='https://google.com' \
+    CHANNEL='random'
 
 RUN mkdir -p /srv
 WORKDIR /srv

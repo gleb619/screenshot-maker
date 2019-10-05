@@ -10,6 +10,7 @@
     "@slack/web-api": "^5.2.0",
     "express": "^4.15.3",
     "node-cron": "^2.0.3",
+    "node-server-screenshot": "^0.2.2",
     "nodemon": "^1.11.0",
     "uuid-random": "^1.3.0",
     "webshot": "^0.18.0"

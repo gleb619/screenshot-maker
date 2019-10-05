@@ -1,13 +1,14 @@
 const express = require('express');
 const fs = require('fs');
 const webshot = require('webshot');
+const servershot = require('node-server-screenshot');
 const cron = require('node-cron');
 const uuid = require('uuid-random');
 const { WebClient } = require('@slack/web-api');
 
 const token = process.env.SLACK_TOKEN || 'YOURS-DEFAULT-TOKEN';
 const site = process.env.SITE || 'https://google.com';
-const channel = process.env.CHANNEL || 'general';
+const channel = process.env.CHANNEL || 'random';
 const web = new WebClient(token);
 const app = express();
 const port = 9000;
@@ -33,7 +34,7 @@ cron.schedule('*/30 * * * *', () => {
 
 service.work = async () => {
     try {
-        console.log(`Prepare to check site health at ${service.now()}...`);
+        console.log(`Prepare to check site[${site}] health at ${service.now()}...`);
         const screenshotFile = await service.makeScreenshot();
         const message = await service.sendMessage(screenshotFile);
     } catch (e) {
@@ -44,26 +45,61 @@ service.work = async () => {
 service.makeScreenshot = () => {
     return new Promise(resolve => {
         const file = `/tmp/${uuid()}.png`;
+        let options = {
+            renderDelay: 3000,
+            screenSize: {
+                width: 1280,
+                height: 1024
+            },
+            userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.90 Safari/537.36'
+        };
 
-        webshot(site, file, { renderDelay: 3000 }, function(err) {
-            if(err != null){
-                console.error(err);
-            } else {
-                console.log(`Made site screenshot for ${file}`);
-            }
+        try {
+            webshot(site, file, options, function (err) {
+                if (err != null) {
+                    console.error(err);
+                } else {
+                    console.log(`Made site screenshot for ${file}`);
+                }
 
+                resolve(file);
+            });
+        } catch (e) {
+            console.error(e);
             resolve(file);
-        });
+        }
+
+    });
+};
+
+service.makeScreenshot2 = () => {
+    return new Promise(resolve => {
+        const file = `/tmp/${uuid()}.png`;
+        let options = {
+            waitMilliseconds: 3000,
+            width: 1280,
+            height: 1024
+        };
+
+        try {
+            servershot.fromURL(site, file, options, function () {
+                console.log(`Made site screenshot for ${file}`);
+                resolve(file);
+            });
+        } catch (e) {
+            console.error(e);
+            resolve(file);
+        }
     });
 };
 
 service.sendMessage = async ( screenshotFile ) => {
     console.log('Sending screenshot to slack');
-    const res = await web.chat.postMessage({
-        channel: channel,
-        text: 'Hello there',
-        as_user: true
-    });
+    // const res = await web.chat.postMessage({
+    //     channel: channel,
+    //     text: 'Hello there',
+    //     as_user: true
+    // });
 
     const res2 = await web.files.upload({
         filename: `${service.now()}.png`,
@@ -75,7 +111,7 @@ service.sendMessage = async ( screenshotFile ) => {
 
     service.removeFile(screenshotFile);
 
-    console.log('Message sending status: ', res.ok);
+    // console.log('Message sending status: ', res.ok);
     console.log('File sending status: ', res2.ok);
     console.log('-----');
 };
