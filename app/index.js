@@ -1,20 +1,22 @@
 const express = require('express');
 const fs = require('fs');
-const webshot = require('webshot');
-const servershot = require('node-server-screenshot');
 const cron = require('node-cron');
-const uuid = require('uuid-random');
+const makeScreenshot = require('./screentshotMaker'); 
 const { WebClient } = require('@slack/web-api');
+require('dotenv').config({
+    path: '../.env'
+})
+
 
 const token = process.env.SLACK_TOKEN || 'YOURS-DEFAULT-TOKEN';
 const site = process.env.SITE || 'https://google.com';
-const channel = process.env.CHANNEL || 'random';
+const channel = process.env.CHANNEL || 'DEFAULT';
+const delayTime = process.env.DELAY_TIME || 10000;
 const web = new WebClient(token);
 const app = express();
 const port = 9000;
 const service = {};
 
-/* ====================== */
 
 app.get('/api/shoot', (req, res) => {
     service.work();
@@ -35,85 +37,41 @@ cron.schedule('*/30 * * * *', () => {
 service.work = async () => {
     try {
         console.log(`Prepare to check site[${site}] health at ${service.now()}...`);
-        const screenshotFile = await service.makeScreenshot();
-        const message = await service.sendMessage(screenshotFile);
+        const { file, filePath } = await service.makeScreenshot({
+            url: site,
+            delayTime
+        });
+        console.log(file, filePath);
+        const message = await service.sendMessage(filePath);
+
+        // service.removeFile(filePath);
+
     } catch (e) {
         console.error(e)
     }
 };
 
-service.makeScreenshot = () => {
-    return new Promise(resolve => {
-        const file = `/tmp/${uuid()}.png`;
-        let options = {
-            renderDelay: 3000,
-            screenSize: {
-                width: 1280,
-                height: 1024
-            },
-            userAgent: 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/77.0.3865.90 Safari/537.36'
-        };
-
-        try {
-            webshot(site, file, options, function (err) {
-                if (err != null) {
-                    console.error(err);
-                } else {
-                    console.log(`Made site screenshot for ${file}`);
-                }
-
-                resolve(file);
-            });
-        } catch (e) {
-            console.error(e);
-            resolve(file);
-        }
-
-    });
-};
-
-service.makeScreenshot2 = () => {
-    return new Promise(resolve => {
-        const file = `/tmp/${uuid()}.png`;
-        let options = {
-            waitMilliseconds: 3000,
-            width: 1280,
-            height: 1024
-        };
-
-        try {
-            servershot.fromURL(site, file, options, function () {
-                console.log(`Made site screenshot for ${file}`);
-                resolve(file);
-            });
-        } catch (e) {
-            console.error(e);
-            resolve(file);
-        }
-    });
-};
+service.makeScreenshot = makeScreenshot;
 
 service.sendMessage = async ( screenshotFile ) => {
     console.log('Sending screenshot to slack');
-    // const res = await web.chat.postMessage({
-    //     channel: channel,
-    //     text: 'Hello there',
-    //     as_user: true
-    // });
 
-    const res2 = await web.files.upload({
-        filename: `${service.now()}.png`,
-        fileType: 'png',
-        title: service.now(),
-        channels: channel,
-        file: fs.createReadStream(screenshotFile)
-    });
+    try {
+        const res2 = await web.files.upload({
+            filename: `${service.now()}.png`,
+            fileType: 'png',
+            title: service.now(),
+            channels: channel,
+            file: fs.createReadStream(screenshotFile)
+        });
 
-    service.removeFile(screenshotFile);
+        console.log('File sending status: ', res2.ok);
 
-    // console.log('Message sending status: ', res.ok);
-    console.log('File sending status: ', res2.ok);
-    console.log('-----');
+    } catch(e) {
+        console.error(e);
+        return;
+    }
+
 };
 
 service.now = () => {
@@ -123,10 +81,19 @@ service.now = () => {
 };
 
 service.removeFile = ( filename ) => {
+    console.log('Delete file');
     fs.exists(filename, function(exists) {
         if(exists) {
             console.log('File exists. Deleting now ...');
-            fs.unlink(filename);
+            fs.unlink(filename, (err) => {
+                if (err) {
+                    console.log('There is an error occured when deleting file');
+                    return;
+                }
+                console.log('File deleted')
+            });
+        } else {
+            console.log('File does not exist');
         }
     });
 };
