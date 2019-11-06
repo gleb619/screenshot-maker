@@ -1,9 +1,9 @@
 FROM buildkite/puppeteer
 
 ENV SLACK_TOKEN='YOURS-DEFAULT-TOKEN' \
-    SITE='https://test.altyn-i.kz/customer/login' \
+    SITE='https://google.com' \
     CHANNEL='random' \
-    DELAY_TIME=10000
+    DELAY_TIME=3000
 
 
 RUN mkdir -p /srv

@@ -3,20 +3,26 @@ const fs = require('fs');
 const cron = require('node-cron');
 const makeScreenshot = require('./screentshotMaker'); 
 const { WebClient } = require('@slack/web-api');
+const imageDiff = require('image-diff');
 require('dotenv').config({
     path: '../.env'
-})
+});
 
 
 const token = process.env.SLACK_TOKEN || 'YOURS-DEFAULT-TOKEN';
 const site = process.env.SITE || 'https://google.com';
-const channel = process.env.CHANNEL || 'DEFAULT';
-const delayTime = process.env.DELAY_TIME || 10000;
+const channel = process.env.CHANNEL || 'random';
+const delayTime = process.env.DELAY_TIME || 3000;
 const web = new WebClient(token);
 const app = express();
-const port = 9000;
-const service = {};
+const port = process.env.SERVER_PORT || 9000;
+const service = {
 
+    makeScreenshot: makeScreenshot
+
+};
+
+/* ====================== */
 
 app.get('/api/shoot', (req, res) => {
     service.work();
@@ -37,26 +43,32 @@ cron.schedule('*/30 * * * *', () => {
 service.work = async () => {
     try {
         console.log(`Prepare to check site[${site}] health at ${service.now()}...`);
-        const { file, filePath } = await service.makeScreenshot({
+        const screenshotResult = await service.makeScreenshot({
             url: site,
             delayTime
         });
-        console.log(file, filePath);
-        const message = await service.sendMessage(filePath);
+        service.detectChanges();
 
-        // service.removeFile(filePath);
-
+        if(screenshotResult.success) {
+            const message = await service.sendMessage(screenshotResult.filePath);
+        }
+        service.backupFile(screenshotResult.filePath);
+        // service.removeFile(screenshotResult.filePath);
     } catch (e) {
         console.error(e)
     }
 };
 
-service.makeScreenshot = makeScreenshot;
-
 service.sendMessage = async ( screenshotFile ) => {
     console.log('Sending screenshot to slack');
 
     try {
+        // const res = await web.chat.postMessage({
+        //     channel: channel,
+        //     text: 'Hello there',
+        //     as_user: true
+        // });
+
         const res2 = await web.files.upload({
             filename: `${service.now()}.png`,
             fileType: 'png',
@@ -66,12 +78,23 @@ service.sendMessage = async ( screenshotFile ) => {
         });
 
         console.log('File sending status: ', res2.ok);
-
     } catch(e) {
         console.error(e);
         return;
     }
 
+};
+
+service.detectChanges = ( newFile, oldFile ) => {
+    console.log('Detecting changes');
+
+    imageDiff.getFullResult({
+        actualImage: oldFile,
+        expectedImage: newFile
+        // ,diffImage: 'difference.png',
+    }, function (err, result) {
+        console.info('result: ', result);
+    });
 };
 
 service.now = () => {
@@ -81,7 +104,6 @@ service.now = () => {
 };
 
 service.removeFile = ( filename ) => {
-    console.log('Delete file');
     fs.exists(filename, function(exists) {
         if(exists) {
             console.log('File exists. Deleting now ...');
