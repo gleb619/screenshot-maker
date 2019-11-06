@@ -1,8 +1,10 @@
-FROM node:8.10.0
+FROM buildkite/puppeteer
 
 ENV SLACK_TOKEN='YOURS-DEFAULT-TOKEN' \
     SITE='https://google.com' \
-    CHANNEL='random'
+    CHANNEL='random' \
+    DELAY_TIME=3000
+
 
 RUN mkdir -p /srv
 WORKDIR /srv
